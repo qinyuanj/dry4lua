@@ -42,7 +42,10 @@ end
 -- symlinks neither followed nor collected. Walks with luafilesystem instead of
 -- shelling out, so discovery works the same under cmd.exe and POSIX shells.
 local function walk(path, files)
-  local mode = lfs.symlinkattributes(path, "mode")
+  local mode, err = lfs.symlinkattributes(path, "mode")
+  if mode == nil then
+    error("cannot access path: " .. path .. ": " .. tostring(err), 0)
+  end
   if mode == "file" then
     if path:match("%.lua$") then
       files[#files + 1] = path
@@ -66,10 +69,10 @@ end
 function analysis.collect_files(paths)
   local files = {}
   for _, path in ipairs(paths) do
-    if lfs.symlinkattributes(path, "mode") == nil then
-      return nil, "cannot access path: " .. path
+    local ok, err = pcall(walk, path, files)
+    if not ok then
+      return nil, tostring(err)
     end
-    walk(path, files)
   end
   table.sort(files)
   return files
