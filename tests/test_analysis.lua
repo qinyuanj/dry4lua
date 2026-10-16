@@ -37,6 +37,24 @@ function TestAnalysis:test_collect_files_reports_a_missing_path_instead_of_an_em
   lu.assertStrContains(err, "no_such_dir")
 end
 
+function TestAnalysis:test_collect_files_reports_windows_directory_iteration_errors()
+  -- Filesystem seam: Windows lfs returns nil, error when _findfirst fails.
+  local lfs = require("lfs")
+  local original = lfs.dir
+  lfs.dir = function(path)
+    if path == FIXTURES then
+      return function() return nil, "Access is denied" end, {}
+    end
+    return original(path)
+  end
+  local ok, files, err = pcall(analysis.collect_files, { FIXTURES })
+  lfs.dir = original
+  lu.assertTrue(ok)
+  lu.assertNil(files)
+  lu.assertStrContains(err, "Access is denied")
+  lu.assertStrContains(err, FIXTURES)
+end
+
 function TestAnalysis:test_find_duplicates_raises_on_a_missing_path()
   local ok, err = pcall(analysis.find_duplicates, { paths = { ROOT .. "/tests/no_such_dir" } })
   lu.assertFalse(ok)

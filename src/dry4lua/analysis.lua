@@ -55,7 +55,17 @@ local function walk(path, files)
     if base == "" then
       base = path
     end
-    for name in lfs.dir(path) do
+    local iterator, state = lfs.dir(path)
+    while true do
+      -- Windows lfs may return nil, error on the first iteration (rather
+      -- than throw). A generic for would discard that error as normal EOF.
+      local name, list_err = iterator(state)
+      if name == nil then
+        if list_err ~= nil then
+          error("cannot list directory: " .. path .. ": " .. tostring(list_err), 0)
+        end
+        break
+      end
       if name ~= "." and name ~= ".." then
         walk(base .. "/" .. name, files)
       end
