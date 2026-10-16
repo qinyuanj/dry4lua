@@ -1,3 +1,4 @@
+local lfs = require("lfs")
 local ast = require("dry4lua.ast")
 
 local analysis = {}
@@ -37,14 +38,38 @@ local function jaccard(fps_a, count_a, fps_b, count_b)
   return intersection / union
 end
 
-local function collect_files(paths)
-  local files = {}
-  local handle = io.popen("find " .. table.concat(paths, " ") .. " -name '*.lua' -type f 2>/dev/null")
-  if handle then
-    for line in handle:lines() do
-      files[#files + 1] = line
+-- Mirrors `find <paths> -name '*.lua' -type f`: recursive, regular files only,
+-- symlinks neither followed nor collected. Walks with luafilesystem instead of
+-- shelling out, so discovery works the same under cmd.exe and POSIX shells.
+local function walk(path, files)
+  local mode = lfs.symlinkattributes(path, "mode")
+  if mode == "file" then
+    if path:match("%.lua$") then
+      files[#files + 1] = path
     end
-    handle:close()
+  elseif mode == "directory" then
+    local base = path:gsub("[/\\]+$", "")
+    if base == "" then
+      base = path
+    end
+    for name in lfs.dir(path) do
+      if name ~= "." and name ~= ".." then
+        walk(base .. "/" .. name, files)
+      end
+    end
+  end
+end
+
+-- collect_files returns the sorted `.lua` files under paths, or nil and an
+-- error naming the first path that does not exist, so a bad path can never
+-- pass as an empty (duplicate-free) scan.
+function analysis.collect_files(paths)
+  local files = {}
+  for _, path in ipairs(paths) do
+    if lfs.symlinkattributes(path, "mode") == nil then
+      return nil, "cannot access path: " .. path
+    end
+    walk(path, files)
   end
   table.sort(files)
   return files
@@ -84,7 +109,10 @@ function analysis.find_duplicates(options)
   local paths = options.paths or { "src" }
 
   local scan_opts = { min_lines = min_lines, min_nodes = min_nodes }
-  local files = collect_files(paths)
+  local files, collect_err = analysis.collect_files(paths)
+  if not files then
+    error(collect_err, 0)
+  end
   local entries = {}
   for _, path in ipairs(files) do
     scan_file(path, entries, scan_opts)

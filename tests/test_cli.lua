@@ -66,4 +66,15 @@ function TestCli:test_negative_limit_exits_with_code_2()
   expect_exit(2, { "--limit", "-1" })
 end
 
+function TestCli:test_missing_path_fails_with_exit_code_1()
+  local real_stderr = io.stderr
+  local written = {}
+  io.stderr = { write = function(_, text) written[#written + 1] = text end }
+  local ok, code = pcall(cli.run, { ROOT .. "/tests/no_such_dir" })
+  io.stderr = real_stderr
+  lu.assertTrue(ok, tostring(code))
+  lu.assertEquals(code, 1)
+  lu.assertStrContains(table.concat(written), "no_such_dir")
+end
+
 return TestCli

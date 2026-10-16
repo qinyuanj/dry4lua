@@ -5,6 +5,44 @@ TestAnalysis = {}
 
 local FIXTURES = ROOT .. "/tests/fixtures"
 
+function TestAnalysis:test_collect_files_lists_lua_files_of_a_directory_sorted()
+  local files = analysis.collect_files({ FIXTURES })
+  lu.assertEquals(files, {
+    FIXTURES .. "/dup_a.lua",
+    FIXTURES .. "/dup_b.lua",
+    FIXTURES .. "/unique.lua",
+  })
+end
+
+function TestAnalysis:test_collect_files_recurses_and_keeps_only_lua_files()
+  local files = analysis.collect_files({ ROOT .. "/tests" })
+  local found = {}
+  for _, file in ipairs(files) do
+    found[file] = true
+    lu.assertTrue(file:match("%.lua$") ~= nil, "non-lua file collected: " .. file)
+  end
+  lu.assertTrue(found[FIXTURES .. "/dup_a.lua"], "fixtures subdirectory")
+  lu.assertTrue(found[ROOT .. "/tests/corpus/scope.lua"], "corpus subdirectory")
+  lu.assertTrue(found[ROOT .. "/tests/test_analysis.lua"], "top-level file")
+end
+
+function TestAnalysis:test_collect_files_accepts_an_explicit_file()
+  local files = analysis.collect_files({ FIXTURES .. "/unique.lua", ROOT .. "/tests/baseline/text.out" })
+  lu.assertEquals(files, { FIXTURES .. "/unique.lua" })
+end
+
+function TestAnalysis:test_collect_files_reports_a_missing_path_instead_of_an_empty_set()
+  local files, err = analysis.collect_files({ FIXTURES, ROOT .. "/tests/no_such_dir" })
+  lu.assertNil(files)
+  lu.assertStrContains(err, "no_such_dir")
+end
+
+function TestAnalysis:test_find_duplicates_raises_on_a_missing_path()
+  local ok, err = pcall(analysis.find_duplicates, { paths = { ROOT .. "/tests/no_such_dir" } })
+  lu.assertFalse(ok)
+  lu.assertStrContains(tostring(err), "no_such_dir")
+end
+
 function TestAnalysis:test_finds_the_structurally_identical_fixture_pair()
   local candidates = analysis.find_duplicates({ paths = { FIXTURES } })
   lu.assertEquals(#candidates, 1)

@@ -12,22 +12,24 @@ if luacheck_dir then
 end
 
 local lu = require("luaunit")
+local lfs = require("lfs")
 
-local function shell_quote(text)
-  return "'" .. tostring(text):gsub("'", "'\\''") .. "'"
-end
-
+-- Suites live directly under tests/ (fixtures/corpus/baseline are data
+-- directories), so a flat listing is enough and needs no external `find`.
 local function discover_test_files()
+  local dir = ROOT .. "/tests"
   local files = {}
-  local pipe = io.popen("find " .. shell_quote(ROOT .. "/tests")
-    .. " -name 'test_*.lua' -type f"
-    .. " -not -path '*/fixtures/*'"
-    .. " -not -path '*/corpus/*'"
-    .. " -not -path '*/baseline/*' 2>/dev/null")
-  for line in pipe:lines() do
-    files[#files + 1] = line
+  local ok, iter, state = pcall(lfs.dir, dir)
+  if not ok then
+    io.stderr:write("cannot list test directory " .. dir .. ": " .. tostring(iter) .. "\n")
+    os.exit(1)
   end
-  pipe:close()
+  for name in iter, state do
+    local path = dir .. "/" .. name
+    if name:match("^test_.*%.lua$") and lfs.attributes(path, "mode") == "file" then
+      files[#files + 1] = path
+    end
+  end
   table.sort(files)
   return files
 end
@@ -37,8 +39,14 @@ local function suite_name_for(path)
   return (base:gsub("[^%w_]", "_"))
 end
 
+local test_files = discover_test_files()
+if #test_files == 0 then
+  io.stderr:write("no test files discovered under " .. ROOT .. "/tests\n")
+  os.exit(1)
+end
+
 local instances = {}
-for _, file in ipairs(discover_test_files()) do
+for _, file in ipairs(test_files) do
   local chunk, load_err = loadfile(file)
   if chunk == nil then
     io.stderr:write("cannot load test file " .. file .. ": " .. tostring(load_err) .. "\n")

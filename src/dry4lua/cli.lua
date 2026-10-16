@@ -133,7 +133,11 @@ function cli.run(args)
     print(USAGE)
     return 0
   end
-  local candidates = analysis.find_duplicates(options)
+  local ok, candidates = pcall(analysis.find_duplicates, options)
+  if not ok then
+    io.stderr:write("Error: " .. tostring(candidates) .. "\n")
+    return 1
+  end
   if options.format == "json" then
     format_json(candidates)
   else

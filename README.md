@@ -47,7 +47,9 @@ Lua 源码的结构性重复检测器。
 - JSON 输出带函数 `name` 字段（dry4go 同样输出 JSON；clj/java 输出
   EDN）—— 供 CI/工具链消费。
 - 文本输出额外提供 `--limit` 选项。
-- 文件收集委托给外部 `find`。
+- 文件收集用 luafilesystem 纯 Lua 递归遍历（语义同 `find -name '*.lua' -type f`：
+  只取普通 `.lua` 文件、不跟随符号链接），不依赖外部 `find` / shell，原生 Windows
+  可用；路径不存在时显式报错（CLI 退 1），不会静默当作空扫描。
 - 嵌套函数在父级指纹中折叠为 `(function)` 叶节点（在 upstream-aligned
   的 `overlaps` 对排除之上额外增加）。上游 dry4java 将子函数体留在
   父级指纹中，仅依赖 `overlaps`，这可能使结构不同的父级仅因为共享

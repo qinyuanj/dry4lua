@@ -18,6 +18,7 @@ description = {
 dependencies = {
    "lua >= 5.4",
    "luacheck == 1.2.0-1",
+   "luafilesystem == 1.9.0-1",
 }
 test_dependencies = {
    "luaunit == 3.5-1",
